@@ -5,14 +5,16 @@ memory usage for macOS.
 
 ```sh
 brew tap cliveportman/memtop
+brew trust cliveportman/memtop
 brew install memtop
 ```
 
-Or in one step:
-
-```sh
-brew install cliveportman/memtop/memtop
-```
+The `brew trust` step is not optional. Homebrew 6 refuses to load formulae from
+third-party taps until you explicitly trust them, and the error it gives you if
+you skip it is clear enough but easy to hit. It is a sensible default: a tap is
+arbitrary Ruby from a stranger on the internet, and Homebrew would rather you
+said so out loud. Read [the formula](Formula/memtop.rb) first if you like — it
+is twenty lines and installs a single shell script.
 
 ## Why a tap and not homebrew-core
 
