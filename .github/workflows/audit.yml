@@ -1,0 +1,78 @@
+# Turns the manual step at the end of your release checklist into something
+# that runs whether or not you remember it. --online is the important half:
+# it re-fetches the tarball and verifies the pinned sha256 still matches,
+# which catches a retagged release or a rewritten upstream tag.
+
+name: audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 8 * * 1"   # weekly: detects if the pinned tarball ever changes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  brew-audit:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: tap
+          persist-credentials: false
+
+      - name: Tap from the checkout
+        run: brew tap cliveportman/memtop "$GITHUB_WORKSPACE/tap"
+
+      - name: brew style
+        run: brew style cliveportman/memtop
+
+      - name: brew audit
+        run: brew audit --strict --online cliveportman/memtop/memtop
+
+      # Proves the formula actually installs and the binary runs. --once exits
+      # after one frame and needs no tty, so it won't hang the runner.
+      #
+      # No `|| echo` fallback: swallowing the exit status makes the step
+      # decorative — the audit would pass with a binary that cannot run, which
+      # is the one thing this step exists to catch. Verified exiting 0 on
+      # macos-latest.
+      - name: Install and smoke test
+        run: |
+          brew install cliveportman/memtop/memtop
+          memtop --once
+
+  secrets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # On a pull_request event the action calls
+      # GET /repos/{owner}/{repo}/pulls/{n}/commits before scanning, to derive
+      # the baseRef^..headRef range it passes to git. That read succeeds today
+      # on contents: read only because this repo is public; declaring the
+      # scope makes the dependency explicit and survives the repo going
+      # private. Read, not write — see the comment on the step below.
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # v3 targets node24; v2 targets node20, which the runner already reports
+      # as deprecated and force-runs on 24 until node20 is removed outright.
+      # No licence key is needed for a personal account on either version.
+      #
+      # Comments are off deliberately. Posting a leak inline calls
+      # createReviewComment, which needs pull-requests: WRITE — a wider grant
+      # than this workflow should hold to annotate a failure it already
+      # reports in the log. The job's read scope covers the pre-scan commits
+      # fetch; a leak still fails the job either way.
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
