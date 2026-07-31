@@ -6,15 +6,15 @@ class Memtop < Formula
   license "MIT"
   head "https://github.com/cliveportman/memtop.git", branch: "main"
 
-  # vm_stat, sysctl and top -stats mem are macOS-only. Failing here is a clear
-  # message; failing at runtime is a confusing one.
-  depends_on :macos
-
   # Strictly this is only needed by --usage and for resolving WezTerm pane
   # titles, so the tool is useful without it. Made a hard dependency anyway:
   # "installed it and one of the views silently does nothing" is a bad first
   # impression, and jq is small.
   depends_on "jq"
+
+  # vm_stat, sysctl and top -stats mem are macOS-only. Failing here is a clear
+  # message; failing at runtime is a confusing one.
+  depends_on :macos
 
   def install
     bin.install "memtop"
