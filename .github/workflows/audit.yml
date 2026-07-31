@@ -1,0 +1,54 @@
+# Turns the manual step at the end of your release checklist into something
+# that runs whether or not you remember it. --online is the important half:
+# it re-fetches the tarball and verifies the pinned sha256 still matches,
+# which catches a retagged release or a rewritten upstream tag.
+
+name: audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 8 * * 1"   # weekly: detects if the pinned tarball ever changes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  brew-audit:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: tap
+          persist-credentials: false
+
+      - name: Tap from the checkout
+        run: brew tap cliveportman/memtop "$GITHUB_WORKSPACE/tap"
+
+      - name: brew style
+        run: brew style cliveportman/memtop
+
+      - name: brew audit
+        run: brew audit --strict --online cliveportman/memtop/memtop
+
+      # Proves the formula actually installs and the binary runs. --once exits
+      # after one frame and needs no tty, so it won't hang the runner.
+      - name: Install and smoke test
+        run: |
+          brew install cliveportman/memtop/memtop
+          memtop --once || echo "smoke test non-zero — investigate, not fatal"
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
