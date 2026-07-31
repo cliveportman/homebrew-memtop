@@ -37,10 +37,15 @@ jobs:
 
       # Proves the formula actually installs and the binary runs. --once exits
       # after one frame and needs no tty, so it won't hang the runner.
+      #
+      # No `|| echo` fallback: swallowing the exit status makes the step
+      # decorative — the audit would pass with a binary that cannot run, which
+      # is the one thing this step exists to catch. Verified exiting 0 on
+      # macos-latest.
       - name: Install and smoke test
         run: |
           brew install cliveportman/memtop/memtop
-          memtop --once || echo "smoke test non-zero — investigate, not fatal"
+          memtop --once
 
   secrets:
     runs-on: ubuntu-latest
@@ -49,6 +54,16 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: gitleaks/gitleaks-action@v2
+      # v3 targets node24; v2 targets node20, which the runner already reports
+      # as deprecated and force-runs on 24 until node20 is removed outright.
+      # No licence key is needed for a personal account on either version.
+      #
+      # The only pull-request API this action touches is createReviewComment,
+      # for posting a leak inline on the PR. That needs pull-requests: WRITE,
+      # not read, so granting read would widen the token without making the
+      # call work. Turn commenting off instead and keep contents: read — the
+      # scan itself needs no pull-request scope, and a leak still fails the job.
+      - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
