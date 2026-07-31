@@ -49,6 +49,15 @@ jobs:
 
   secrets:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # On a pull_request event the action calls
+      # GET /repos/{owner}/{repo}/pulls/{n}/commits before scanning, to derive
+      # the baseRef^..headRef range it passes to git. That read succeeds today
+      # on contents: read only because this repo is public; declaring the
+      # scope makes the dependency explicit and survives the repo going
+      # private. Read, not write — see the comment on the step below.
+      pull-requests: read
     steps:
       - uses: actions/checkout@v5
         with:
@@ -58,11 +67,11 @@ jobs:
       # as deprecated and force-runs on 24 until node20 is removed outright.
       # No licence key is needed for a personal account on either version.
       #
-      # The only pull-request API this action touches is createReviewComment,
-      # for posting a leak inline on the PR. That needs pull-requests: WRITE,
-      # not read, so granting read would widen the token without making the
-      # call work. Turn commenting off instead and keep contents: read — the
-      # scan itself needs no pull-request scope, and a leak still fails the job.
+      # Comments are off deliberately. Posting a leak inline calls
+      # createReviewComment, which needs pull-requests: WRITE — a wider grant
+      # than this workflow should hold to annotate a failure it already
+      # reports in the log. The job's read scope covers the pre-scan commits
+      # fetch; a leak still fails the job either way.
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
